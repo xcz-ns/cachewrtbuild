@@ -24,7 +24,6 @@ async function fetchCache() {
             core.debug(`Changed working directory to: ${prefix}`);
         }
 
-        #let keyString = mixkey ? `${mixkey}-cache-openwrt` : "cache-openwrt";
         let keyString = `cache-openwrt--1750504499`;
 
         const cacheToolchain = parseBooleanInput(core.getInput("toolchain"), true);
