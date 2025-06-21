@@ -3,12 +3,6 @@ const { execSync } = require("child_process");
 const path = require("path");
 const cache = require("@actions/cache");
 
-/**
- * 解析字符串输入为布尔值
- * @param {string} value 输入字符串
- * @param {boolean} defaultValue 默认值
- * @returns {boolean}
- */
 function parseBooleanInput(value, defaultValue = false) {
     const normalized = value.trim().toLowerCase();
     return { 'true': true, 'false': false }[normalized] ?? defaultValue;
@@ -33,13 +27,12 @@ async function fetchCache() {
             core.debug(`切换当前工作目录到: ${prefix}`);
         }
 
-        const timestamp = execSync("date +%s").toString().trim();
-
-        let keyString = mixkey ? `${mixkey}-cache-openwrt--${timestamp}` : `cache-openwrt--${timestamp}`;
+        // 恢复缓存时用固定的key，不带时间戳
+        let keyString = mixkey ? `${mixkey}-cache-openwrt--` : "cache-openwrt--";
 
         const cacheCcache = parseBooleanInput(core.getInput("ccache"));
         if (cacheCcache) {
-            restoreKeys.unshift(mixkey ? `${mixkey}-cache-openwrt--` : 'cache-openwrt--');
+            restoreKeys.unshift(keyString);  // 作为备选键
             paths.push(".ccache");
         }
 
