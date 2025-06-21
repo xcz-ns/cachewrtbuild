@@ -44,6 +44,9 @@ async function fetchCache() {
         // 构造缓存 key 的基础部分
         let keyString = mixkey ? `${mixkey}-cache-openwrt` : "cache-openwrt";
 
+            // 添加一个备选 key（模糊匹配用），不含时间戳
+            restoreKeys.unshift(keyString);
+
         // 是否恢复工具链缓存
         const cacheToolchain = parseBooleanInput(core.getInput("toolchain"), true);
 
@@ -74,7 +77,7 @@ async function fetchCache() {
             const timestamp = execSync("date +%s").toString().trim(); // 当前时间戳（秒）
 
             // 添加一个备选 key（模糊匹配用），不含时间戳
-            restoreKeys.unshift(keyString);
+            // restoreKeys.unshift(keyString);
 
             // 拼接完整 key（含时间戳，通常不会精准命中）
             keyString += `-${timestamp}`;
