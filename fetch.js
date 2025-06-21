@@ -45,9 +45,7 @@ async function fetchCache() {
 
         const cacheCcache = parseBooleanInput(core.getInput("ccache"));
         if (cacheCcache) {
-            const timestamp = execSync("date +%s").toString().trim();
-            restoreKeys.unshift(keyString);
-            keyString += `-${timestamp}`;
+            restoreKeys.unshift(`${keyString}--`);
             paths.push(".ccache");
         }
 
