@@ -11,12 +11,9 @@ function parseBooleanInput(value, defaultValue = false) {
 async function fetchCache() {
     try {
         const paths = [];
-        const restoreKeys = [];
 
-        const mixkey = core.getInput("mixkey");
         const prefix = core.getInput("prefix");
         const cleanUpCache = parseBooleanInput(core.getInput("clean"));
-
         if (cleanUpCache) return;
 
         if (prefix) {
@@ -24,48 +21,32 @@ async function fetchCache() {
             core.debug(`Changed working directory to: ${prefix}`);
         }
 
-        let keyString = `cache-openwrt--1750504499`;
+        // ✅ 固定 key
+        const keyString = "cache-openwrt--1750504499";
 
+        // ✅ 只指定你已缓存的内容路径
         const cacheToolchain = parseBooleanInput(core.getInput("toolchain"), true);
-        const skipBuildingToolchain = parseBooleanInput(core.getInput("skip"), true);
-
         if (cacheToolchain) {
-            const toolchainHash = execSync('git log --pretty=tformat:"%h" -n1 tools toolchain')
-                .toString()
-                .trim();
-
-            keyString += `-${toolchainHash}`;
-            paths.push(
-                path.join("staging_dir", "host*"),
-                path.join("staging_dir", "tool*")
-            );
-        } else {
-            core.debug("Skipping toolchain processing");
+            paths.push("staging_dir/host*", "staging_dir/tool*");
         }
 
         const cacheCcache = parseBooleanInput(core.getInput("ccache"));
         if (cacheCcache) {
-            const timestamp = execSync("date +%s").toString().trim();
-            restoreKeys.unshift(keyString);
-            keyString += `-${timestamp}`;
             paths.push(".ccache");
         }
 
         core.debug(`Cache paths: ${paths.join(", ")}`);
-        console.log(keyString, restoreKeys);
+        console.log("使用缓存 key:", keyString);
 
-        const cacheFetchingResult = await cache.restoreCache(paths, keyString, restoreKeys);
+        const cacheFetchingResult = await cache.restoreCache(paths, keyString);
 
         if (cacheFetchingResult) {
-            core.info(`${cacheFetchingResult} cache fetched!`);
-            core.setOutput("hit", "1");
+            core.info(`✅ 缓存命中：${cacheFetchingResult}`);
+            core.setOutput("hit", "true");
             core.saveState("CACHE_STATE", "hit");
-
-            if (cacheToolchain && skipBuildingToolchain) {
-                execSync("sed -i 's/ $(tool.*\\/stamp-compile)//;' Makefile");
-                execSync("sed -i 's/ $(tool.*\\/stamp-install)//;' Makefile");
-                core.info("Toolchain building skipped");
-            }
+        } else {
+            core.info("❌ 未命中缓存");
+            core.setOutput("hit", "false");
         }
     } catch (error) {
         core.setFailed(error.message);
