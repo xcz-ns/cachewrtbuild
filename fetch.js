@@ -29,6 +29,8 @@ async function fetchCache() {
         const cacheToolchain = parseBooleanInput(core.getInput("toolchain"), true);
         const skipBuildingToolchain = parseBooleanInput(core.getInput("skip"), true);
 
+        // ⚠️ 注释掉 toolchainHash 拼接逻辑，避免影响 keyString
+        /*
         if (cacheToolchain) {
             const toolchainHash = execSync('git log --pretty=tformat:"%h" -n1 tools toolchain')
                 .toString()
@@ -42,13 +44,14 @@ async function fetchCache() {
         } else {
             core.debug("Skipping toolchain processing");
         }
+        */
 
         const cacheCcache = parseBooleanInput(core.getInput("ccache"));
         if (cacheCcache) {
+            // 加 restoreKeys 前缀匹配，匹配类似 cache-openwrt--<timestamp>
             restoreKeys.unshift(`${keyString}--`);
             paths.push(".ccache");
         }
-
         core.debug(`Cache paths: ${paths.join(", ")}`);
         console.log(keyString, restoreKeys);
 
