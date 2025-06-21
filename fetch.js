@@ -28,10 +28,14 @@ async function fetchCache() {
         }
 
         // Build base key
-        let keyString = mixkey ? `${mixkey}-cache-openwrt` : "cache-openwrt";
+        const timestamp = execSync("date +%s").toString().trim();
+        let keyString = mixkey ? `${mixkey}-cache-openwrt--${timestamp}` : `cache-openwrt--${timestamp}`;
 
-        const cacheToolchain = parseBooleanInput(core.getInput("toolchain"), true);
-        const skipBuildingToolchain = parseBooleanInput(core.getInput("skip"), true);
+        const cacheCcache = parseBooleanInput(core.getInput("ccache"));
+        if (cacheCcache) {
+            restoreKeys.unshift(mixkey ? `${mixkey}-cache-openwrt--` : 'cache-openwrt--');
+            paths.push(".ccache");
+        }
 
         // ❌ Toolchain hash is ignored for compatibility with existing caches
         // If needed later, uncomment this block
