@@ -82,16 +82,23 @@ async function fetchCache() {
             // 主 Key：带时间戳，优先级最高
             mainKey = `${keyWithToolchainHash}-${timestamp}`;
 
-            // 备选 keys 顺序：[keyWithToolchainHash, baseKey]
+            // 备选 keys 顺序：
+            // restoreKeys.push(keyWithToolchainHash);
+            // restoreKeys.push(baseKey);
+
+            // ===== 修改点：只保留 keyWithToolchainHash 作为唯一备选 key =====
             restoreKeys.push(keyWithToolchainHash);
-            restoreKeys.push(baseKey);
 
             // 添加 ccache 缓存路径
             paths.push(".ccache");
         } else {
             // 如果没有 ccache，则主 key 就是 keyWithToolchainHash
-            // 备选 key 是 baseKey
-            restoreKeys.push(baseKey);
+
+            // 原代码：
+            // restoreKeys.push(baseKey);
+
+            // ===== 修改点：改为只用 keyWithToolchainHash 作为备选 key =====
+            restoreKeys.push(keyWithToolchainHash);
         }
 
         core.debug(`Cache paths: ${paths.join(", ")}`);
