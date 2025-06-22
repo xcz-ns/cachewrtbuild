@@ -47,22 +47,10 @@ async function saveCache() {
             // 是否缓存工具链目录（默认 true）
             const cacheToolchain = parseBooleanInput(core.getInput("toolchain"), true);
             if (cacheToolchain) {
-                // 优先从环境变量读取 toolchain 哈希，防止 post 阶段找不到 .git
-                let toolchainHash = process.env.TOOLCHAIN_HASH;
-
-                if (!toolchainHash || toolchainHash === "none") {
-                    try {
-                        toolchainHash = execSync('git log --pretty=tformat:"%h" -n1 tools toolchain')
-                            .toString()
-                            .trim();
-                        core.info(`从 git log 获取工具链哈希：${toolchainHash}`);
-                    } catch (err) {
-                        toolchainHash = "unknown";
-                        core.warning(`获取 toolchainHash 失败，使用默认值：${err.message}`);
-                    }
-                } else {
-                    core.info(`使用环境变量中的工具链哈希：${toolchainHash}`);
-                }
+                // 获取 tools 和 toolchain 子目录的最新提交 hash（作为 key 的一部分）
+                const toolchainHash = execSync('git log --pretty=tformat:"%h" -n1 tools toolchain')
+                    .toString()
+                    .trim();
 
                 // 将 hash 拼接到 key 末尾，确保工具链变动时缓存区分
                 keyString += `-${toolchainHash}`;
@@ -88,7 +76,7 @@ async function saveCache() {
             }
 
             // 输出最终生成的缓存 key（调试用途）
-            console.log(`最终缓存 key: ${keyString}`);
+            console.log(keyString);
 
             // 保存缓存
             await cache.saveCache(paths, keyString)
@@ -105,25 +93,3 @@ async function saveCache() {
 
 // 执行保存缓存函数
 saveCache();
-
-/* 
-// 原始代码：
-
-// 是否缓存工具链目录（默认 true）
-// const cacheToolchain = parseBooleanInput(core.getInput("toolchain"), true);
-// if (cacheToolchain) {
-//     // 获取 tools 和 toolchain 子目录的最新提交 hash（作为 key 的一部分）
-//     const toolchainHash = execSync(
-//         'git log --pretty=tformat:"%h" -n1 tools toolchain'
-//     ).toString().trim();
-
-//     // 将 hash 拼接到 key 末尾，确保工具链变动时缓存区分
-//     keyString += `-${toolchainHash}`;
-
-//     // 添加需要缓存的路径（OpenWrt 工具链相关输出）
-//     paths.push(
-//         path.join("staging_dir", "host*"),
-//         path.join("staging_dir", "tool*")
-//     );
-// }
-*/
