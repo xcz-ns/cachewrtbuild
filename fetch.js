@@ -25,7 +25,7 @@ function parseBooleanInput(value, defaultValue = false) {
 async function fetchCache() {
     try {
         const paths = [];        // 要恢复缓存的路径列表
-        const restoreKeys = []; // 用于模糊匹配的备用 key 列表
+        const restoreKeys = [];  // 用于模糊匹配的备用 key 列表
 
         // 读取传入的参数
         const mixkey = core.getInput("mixkey");     // 自定义 key，用于区分架构/平台
@@ -42,10 +42,7 @@ async function fetchCache() {
         }
 
         // 构造缓存 key 的基础部分
-        let keyString = mixkey ? `${mixkey}-cache-openwrt` : "cache-openwrt";
-
-            // 添加一个备选 key（模糊匹配用），不含时间戳
-            // restoreKeys.unshift(keyString);
+        const baseKey = mixkey ? `${mixkey}-cache-openwrt` : "cache-openwrt";
 
         // 是否恢复工具链缓存
         const cacheToolchain = parseBooleanInput(core.getInput("toolchain"), true);
@@ -53,14 +50,16 @@ async function fetchCache() {
         // 是否跳过工具链编译
         const skipBuildingToolchain = parseBooleanInput(core.getInput("skip"), true);
 
+        // 备选Key1：包含 toolchainHash
+        let keyWithToolchainHash = baseKey;
+
         if (cacheToolchain) {
             // 获取 tools 和 toolchain 子目录的最近一次 git 提交 hash，确保 key 跟代码变动绑定
             const toolchainHash = execSync('git log --pretty=tformat:"%h" -n1 tools toolchain')
                 .toString()
                 .trim();
 
-            // 拼接工具链的唯一 key
-            keyString += `-${toolchainHash}`;
+            keyWithToolchainHash = `${baseKey}-${toolchainHash}`;
 
             // 添加工具链缓存目录路径
             paths.push(
@@ -73,31 +72,38 @@ async function fetchCache() {
 
         // 是否恢复 ccache 缓存
         const cacheCcache = parseBooleanInput(core.getInput("ccache"));
+
+        // 主 Key（含时间戳）
+        let mainKey = keyWithToolchainHash;
+
         if (cacheCcache) {
-            const timestamp = execSync("date +%s").toString().trim(); // 当前时间戳（秒）
+            const timestamp = execSync("date +%s").toString().trim();
 
-            // 添加一个备选 key（模糊匹配用），不含时间戳
-            restoreKeys.unshift(keyString);
+            // 主 Key：带时间戳，优先级最高
+            mainKey = `${keyWithToolchainHash}-${timestamp}`;
 
-            // 拼接完整 key（含时间戳，通常不会精准命中）
-            keyString += `-${timestamp}`;
+            // 备选 keys 顺序：[keyWithToolchainHash, baseKey]
+            restoreKeys.push(keyWithToolchainHash);
+            restoreKeys.push(baseKey);
 
             // 添加 ccache 缓存路径
             paths.push(".ccache");
+        } else {
+            // 如果没有 ccache，则主 key 就是 keyWithToolchainHash
+            // 备选 key 是 baseKey
+            restoreKeys.push(baseKey);
         }
 
-        // 打印调试信息：缓存路径和最终 key
         core.debug(`Cache paths: ${paths.join(", ")}`);
-        console.log(keyString, restoreKeys);
+        console.log(mainKey, restoreKeys);
 
         // 执行缓存恢复
-        const cacheFetchingResult = await cache.restoreCache(paths, keyString, restoreKeys);
+        const cacheFetchingResult = await cache.restoreCache(paths, mainKey, restoreKeys);
 
-        // 如果成功恢复到缓存
         if (cacheFetchingResult) {
             core.info(`${cacheFetchingResult} cache fetched!`);
-            core.setOutput("hit", "1");                    // 设置输出参数：命中缓存
-            core.saveState("CACHE_STATE", "hit");          // 存储状态，供后续步骤判断
+            core.setOutput("hit", "1");
+            core.saveState("CACHE_STATE", "hit");
 
             // 如果允许跳过工具链编译，就通过 sed 注释掉 Makefile 中的编译/安装依赖
             if (cacheToolchain && skipBuildingToolchain) {
