@@ -7,6 +7,9 @@ const { execSync } = require("child_process");
 // Node.js 路径模块，用于拼接文件路径
 const path = require("path");
 
+// Node.js 文件系统模块，用于读取本地文件
+const fs = require("fs");
+
 // GitHub 官方缓存模块
 const cache = require("@actions/cache");
 
@@ -47,21 +50,26 @@ async function saveCache() {
             // 是否缓存工具链目录（默认 true）
             const cacheToolchain = parseBooleanInput(core.getInput("toolchain"), true);
             if (cacheToolchain) {
-                // 优先从环境变量读取 toolchain 哈希，防止 post 阶段找不到 .git
-                let toolchainHash = process.env.TOOLCHAIN_HASH;
+                let toolchainHash;
 
-                if (!toolchainHash || toolchainHash === "none") {
-                    try {
-                        toolchainHash = execSync('git log --pretty=tformat:"%h" -n1 tools toolchain')
-                            .toString()
-                            .trim();
-                        core.info(`从 git log 获取工具链哈希：${toolchainHash}`);
-                    } catch (err) {
+                try {
+                    // 优先使用 git log 获取 tools 和 toolchain 的提交哈希
+                    toolchainHash = execSync('git log --pretty=tformat:"%h" -n1 tools toolchain')
+                        .toString()
+                        .trim();
+                    core.info(`从 git log 获取工具链哈希：${toolchainHash}`);
+                } catch (err) {
+                    core.warning(`从 git 获取工具链哈希失败：${err.message}`);
+
+                    // git log 失败，尝试读取 .toolchain.hash 文件
+                    const hashPath = path.join(process.cwd(), ".toolchain.hash");
+                    if (fs.existsSync(hashPath)) {
+                        toolchainHash = fs.readFileSync(hashPath, "utf8").trim();
+                        core.info(`从 .toolchain.hash 文件读取工具链哈希：${toolchainHash}`);
+                    } else {
                         toolchainHash = "unknown";
-                        core.warning(`获取 toolchainHash 失败，使用默认值：${err.message}`);
+                        core.warning("未能获取工具链哈希，使用默认值 unknown");
                     }
-                } else {
-                    core.info(`使用环境变量中的工具链哈希：${toolchainHash}`);
                 }
 
                 // 将 hash 拼接到 key 末尾，确保工具链变动时缓存区分
@@ -105,25 +113,3 @@ async function saveCache() {
 
 // 执行保存缓存函数
 saveCache();
-
-/* 
-// 原始代码：
-
-// 是否缓存工具链目录（默认 true）
-// const cacheToolchain = parseBooleanInput(core.getInput("toolchain"), true);
-// if (cacheToolchain) {
-//     // 获取 tools 和 toolchain 子目录的最新提交 hash（作为 key 的一部分）
-//     const toolchainHash = execSync(
-//         'git log --pretty=tformat:"%h" -n1 tools toolchain'
-//     ).toString().trim();
-
-//     // 将 hash 拼接到 key 末尾，确保工具链变动时缓存区分
-//     keyString += `-${toolchainHash}`;
-
-//     // 添加需要缓存的路径（OpenWrt 工具链相关输出）
-//     paths.push(
-//         path.join("staging_dir", "host*"),
-//         path.join("staging_dir", "tool*")
-//     );
-// }
-*/
