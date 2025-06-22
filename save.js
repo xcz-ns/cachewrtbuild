@@ -1,7 +1,7 @@
 // 引入 GitHub Actions 核心工具库，用于读取输入、设置输出等
 const core = require("@actions/core");
 
-// Node.js 子进程模块，用于执行 shell 命令（如 git log, date 等）
+// Node.js 子进程模块，用于执行 shell 命令（如 date）
 const { execSync } = require("child_process");
 
 // Node.js 路径模块，用于拼接文件路径
@@ -50,29 +50,16 @@ async function saveCache() {
             // 是否缓存工具链目录（默认 true）
             const cacheToolchain = parseBooleanInput(core.getInput("toolchain"), true);
             if (cacheToolchain) {
-                let toolchainHash;
+                let toolchainHash = "unknown";
+                const hashPath = path.join(process.cwd(), ".toolchain.hash");
 
-                try {
-                    // 优先使用 git log 获取 tools 和 toolchain 的提交哈希
-                    toolchainHash = execSync('git log --pretty=tformat:"%h" -n1 tools toolchain')
-                        .toString()
-                        .trim();
-                    core.info(`从 git log 获取工具链哈希：${toolchainHash}`);
-                } catch (err) {
-                    core.warning(`从 git 获取工具链哈希失败：${err.message}`);
-
-                    // git log 失败，尝试读取 .toolchain.hash 文件
-                    const hashPath = path.join(process.cwd(), ".toolchain.hash");
-                    if (fs.existsSync(hashPath)) {
-                        toolchainHash = fs.readFileSync(hashPath, "utf8").trim();
-                        core.info(`从 .toolchain.hash 文件读取工具链哈希：${toolchainHash}`);
-                    } else {
-                        toolchainHash = "unknown";
-                        core.warning("未能获取工具链哈希，使用默认值 unknown");
-                    }
+                if (fs.existsSync(hashPath)) {
+                    toolchainHash = fs.readFileSync(hashPath, "utf8").trim();
+                    core.info(`从 .toolchain.hash 文件读取工具链哈希：${toolchainHash}`);
+                } else {
+                    core.warning(".toolchain.hash 文件不存在，使用默认值 unknown");
                 }
 
-                // 将 hash 拼接到 key 末尾，确保工具链变动时缓存区分
                 keyString += `-${toolchainHash}`;
 
                 // 添加需要缓存的路径（OpenWrt 工具链相关输出）
